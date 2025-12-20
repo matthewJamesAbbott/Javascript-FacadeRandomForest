@@ -1,1241 +1,404 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8">
-    <title>Random Forest Trainer with Facade</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 2rem;
-            max-width: 1400px;
-        }
-
-        input,
-        select,
-        textarea,
-        button {
-            margin: 0.5rem 0;
-        }
-
-        .section {
-            margin-bottom: 2rem;
-            border-bottom: 1px solid #ccc;
-            padding-bottom: 1rem;
-        }
-
-        label {
-            display: block;
-            margin-top: 0.5rem;
-        }
-
-        .results {
-            background-color: #f5f5f5;
-            padding: 1rem;
-            margin: 1rem 0;
-            border-radius: 5px;
-        }
-
-        .metric {
-            margin: 0.5rem 0;
-            font-weight: bold;
-        }
-
-        table {
-            border-collapse: collapse;
-            width: 100%;
-            margin: 1rem 0;
-        }
-
-        th,
-        td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-        }
-
-        th {
-            background-color: #f2f2f2;
-        }
-
-        .facade-section {
-            background-color: #e8f4f8;
-            padding: 1rem;
-            border-radius: 5px;
-            margin: 1rem 0;
-        }
-
-        .facade-controls {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 0.5rem;
-        }
-
-        .facade-output {
-            background-color: #fff;
-            border: 1px solid #ccc;
-            padding: 0.5rem;
-            margin-top: 0.5rem;
-            font-family: monospace;
-            white-space: pre-wrap;
-            max-height: 400px;
-            overflow-y: auto;
-        }
-
-        .inline-controls {
-            display: flex;
-            gap: 1rem;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-
-        .warning {
-            color: #b36b00;
-            background-color: #fff3cd;
-            padding: 0.5rem;
-            border-radius: 4px;
-            margin: 0.5rem 0;
-        }
-
-        .tree-viz {
-            font-family: monospace;
-            background-color: #f9f9f9;
-            padding: 1rem;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            overflow-x: auto;
-        }
-
-        .progress-bar {
-            width: 100%;
-            height: 25px;
-            background-color: #f0f0f0;
-            border-radius: 5px;
-            overflow: hidden;
-            margin: 0.5rem 0;
-        }
-
-        .progress-fill {
-            height: 100%;
-            background-color: #4CAF50;
-            transition: width 0.3s;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>Facaded Random Forest (JS, Pascal Port)</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin:2rem;}
+    label, input, select, button, textarea { margin: 0.3rem 0; }
+    .section { margin-bottom:2rem; }
+    .results { background:#f5f5f5; padding:1rem; border-radius:5px; }
+    .facade-output { font-family: monospace; background:#fff; border:1px solid #ccc; padding:0.5rem; white-space:pre-wrap; margin-top:5px;}
+    .inline { display:inline-block; margin-right:1rem;}
+  </style>
 </head>
-
 <body>
-    <h1>Random Forest Trainer with Facade</h1>
+  <h1>Facaded Random Forest (JS, Pascal Port)</h1>
 
-    <div class="section">
-        <h2>Forest Configuration</h2>
-        <div class="inline-controls">
-            <label>Number of Trees: <input type="number" id="numTrees" value="10" min="1" max="100"></label>
-            <label>Max Depth: <input type="number" id="maxDepth" value="5" min="1" max="20"></label>
-            <label>Min Samples Leaf: <input type="number" id="minSamplesLeaf" value="1" min="1"></label>
-            <label>Min Samples Split: <input type="number" id="minSamplesSplit" value="2" min="2"></label>
-        </div>
-        <div class="inline-controls">
-            <label>Task Type:
-                <select id="taskType">
-                    <option value="classification" selected>Classification</option>
-                    <option value="regression">Regression</option>
-                </select>
-            </label>
-            <label>Criterion:
-                <select id="criterion">
-                    <option value="gini" selected>Gini</option>
-                    <option value="entropy">Entropy</option>
-                    <option value="mse">MSE</option>
-                </select>
-            </label>
-            <label>Random Seed: <input type="number" id="randomSeed" value="42" min="0"></label>
-        </div>
-        <button onclick="createForest()">Create Forest</button>
-        <span id="forestStatus" style="margin-left:1rem;"></span>
-    </div>
+  <div class="section">
+    <h2>Hyperparameters</h2>
+    <label>Num Trees: <input type="number" id="numTrees" value="10" min="1" max="100"></label>
+    <label>Max Depth: <input type="number" id="maxDepth" value="5" min="1" max="30"></label>
+    <label>Min Samples Leaf: <input type="number" id="minSamplesLeaf" value="1" min="1" max="100"></label>
+    <label>Min Samples Split: <input type="number" id="minSamplesSplit" value="2" min="2" max="100"></label>
+    <label>Max Features: <input type="number" id="maxFeatures" value="0" min="0" max="15"></label>
+    <label>Task Type:
+      <select id="taskType"><option value="classification">Classification</option><option value="regression">Regression</option></select>
+    </label>
+    <label>Criterion:
+      <select id="criterion">
+        <option value="gini">Gini</option>
+        <option value="entropy">Entropy</option>
+        <option value="mse">MSE</option>
+        <option value="variance">VarianceReduction</option>
+      </select>
+    </label>
+    <button onclick="facade.setHyperparameters()">Set Hyperparameters</button>
+  </div>
 
-    <div class="section">
-        <h2>Generate Test Data</h2>
-        <div class="inline-controls">
-            <label>Samples per Class: <input type="number" id="samplesPerClass" value="100" min="10"></label>
-            <label>Number of Features: <input type="number" id="numFeatures" value="4" min="2" max="20"></label>
-            <label>Number of Classes: <input type="number" id="numClasses" value="3" min="2" max="5"></label>
-        </div>
-        <button onclick="generateData()">Generate Data</button>
-        <span id="dataStatus"></span>
-    </div>
+  <div class="section">
+    <h2>Load Data</h2>
+    <textarea id="csvInput" rows="6" cols="60">1,2,3,0
+2,1,3,0
+8,9,7,1
+7,8,9,1
+</textarea><br>
+    <label>Features: <input type="number" id="numFeatures" value="3" min="1" max="15"></label>
+    <label>Samples: <input type="number" id="numSamples" value="4" min="1" max="10000"></label>
+    <button onclick="facade.loadCSV()">Load Data</button>
+  </div>
 
-    <div class="section">
-        <h2>Train Forest</h2>
-        <button onclick="trainForest()">Train Forest</button>
-        <div id="trainStatus"></div>
-        <div class="progress-bar" id="trainProgressBar" style="display:none;">
-            <div class="progress-fill" id="trainProgressFill"></div>
-        </div>
-        <div id="trainResults" class="results" style="display:none;"></div>
-    </div>
+  <div class="section">
+    <h2>Train Forest</h2>
+    <button onclick="facade.trainForest()">Train</button>
+    <span id="trainStatus"></span>
+  </div>
 
-    <div class="section">
-        <h2>Predict</h2>
-        <label>Input Features (comma separated):
-            <input type="text" id="predictInput" value="0.2,0.4,0.6,0.8" style="width:400px;">
-        </label>
-        <button onclick="predict()">Predict</button>
-        <div id="predictOutput"></div>
-    </div>
+  <div class="section">
+    <h2>Predict</h2>
+    <label>Sample (comma separated): <input type="text" id="sampleInput" value="1,2,3"></label>
+    <button onclick="facade.predictSample()">Predict</button>
+    <div class="results" id="predictResult"></div>
+  </div>
 
-    <div class="section facade-section">
-        <h2>🔧 Facade API Explorer</h2>
-        <p>Inspect and modify individual trees and their nodes:</p>
+  <div class="section">
+    <h2>Feature Importances</h2>
+    <button onclick="facade.showFeatureImportances()">Show Importances</button>
+    <div class="results" id="featureImportances"></div>
+  </div>
 
-        <div class="facade-controls">
-            <label>Tree Index: <input type="number" id="facadeTreeIdx" value="0" min="0"></label>
-            <label>Node Index: <input type="number" id="facadeNodeIdx" value="0" min="0"></label>
-            <label>Feature Index: <input type="number" id="facadeFeatureIdx" value="0" min="0"></label>
-        </div>
+  <div class="section">
+    <h2>Forest Info</h2>
+    <button onclick="facade.showForestInfo()">Show Info</button>
+    <div class="results" id="forestInfo"></div>
+  </div>
 
-        <h3>Tree Information</h3>
-        <button onclick="facadeGetTreeInfo()">Get Tree Info</button>
-        <button onclick="facadeGetTreeDepth()">Get Tree Depth</button>
-        <button onclick="facadeGetTreeNumNodes()">Get Num Nodes</button>
-        <button onclick="facadeGetTreeNumLeaves()">Get Num Leaves</button>
-        <button onclick="facadeVisualizeTree()">Visualize Tree</button>
+  <div class="section">
+    <h2>Facade Output & API</h2>
+    <button onclick="facade.inspectTree(0)">Inspect Tree 0</button>
+    <div class="facade-output" id="facadeOutput"></div>
+  </div>
 
-        <h3>Node Information</h3>
-        <button onclick="facadeGetNodeDetails()">Get Node Details</button>
-        <button onclick="facadeIsLeaf()">Is Leaf?</button>
-        <button onclick="facadeGetFeatureIndex()">Get Feature Index</button>
-        <button onclick="facadeGetThreshold()">Get Threshold</button>
-        <button onclick="facadeGetPrediction()">Get Prediction</button>
-        <button onclick="facadeGetImpurity()">Get Impurity</button>
+  <script>
+  "use strict";
 
-        <h3>Tree Manipulation</h3>
-        <label>New Threshold: <input type="number" id="newThreshold" value="0.5" step="0.01"></label>
-        <button onclick="facadeModifySplit()">Modify Split</button>
-        <label>New Leaf Value: <input type="number" id="newLeafValue" value="1" step="0.1"></label>
-        <button onclick="facadeModifyLeaf()">Modify Leaf</button>
-        <button onclick="facadePruneNode()">Prune Node</button>
-        <button onclick="facadeConvertToLeaf()">Convert to Leaf</button>
+  // --- Utility ---
+  function zeros(n) { return Array(n).fill(0); }
+  function range(n) { return Array.from({length:n}, (_,i)=>i); }
+  function shuffle(array) {
+    for (let i = array.length-1; i > 0; i--) {
+      const j = Math.floor(Math.random()*(i+1));
+      [array[i],array[j]] = [array[j],array[i]];
+    }
+  }
+  function parseCSV(txt, nFeatures) {
+    const rows = [];
+    txt.trim().split(/\n/).forEach(line => {
+      const vals = line.split(',').map(Number);
+      if (vals.length>=nFeatures+1) rows.push({features:vals.slice(0,nFeatures), target:vals[nFeatures]});
+    });
+    return rows;
+  }
 
-        <h3>Forest Management</h3>
-        <button onclick="facadeAddTree()">Add New Tree</button>
-        <button onclick="facadeRemoveTree()">Remove Tree</button>
-        <button onclick="facadeRetrainTree()">Retrain Tree</button>
-        <button onclick="facadeGetNumTrees()">Get Num Trees</button>
+  // --- Decision Tree ---
+  class TreeNode {
+    constructor() {
+      this.isLeaf = false;
+      this.featureIndex = -1;
+      this.threshold = 0;
+      this.prediction = 0;
+      this.classLabel = -1;
+      this.impurity = 0;
+      this.numSamples = 0;
+      this.left = null;
+      this.right = null;
+    }
+  }
 
-        <h3>Feature Analysis</h3>
-        <button onclick="facadeGetFeatureImportance()">Get Feature Importance</button>
-        <button onclick="facadeGetFeatureUsage()">Get Feature Usage</button>
-        <button onclick="facadeShowFeatureHeatmap()">Show Feature Heatmap</button>
-
-        <h3>OOB & Diagnostics</h3>
-        <button onclick="facadeGetOOBError()">Get OOB Error</button>
-        <button onclick="facadeGetOOBSummary()">Get OOB Summary</button>
-        <button onclick="facadeTrackSample()">Track Sample</button>
-        <label>Sample Index: <input type="number" id="sampleIdx" value="0" min="0"></label>
-
-        <h3>Output</h3>
-        <div id="facadeOutput" class="facade-output">Facade output will appear here...</div>
-    </div>
-
-    <script>
-        // ==================== Constants ====================
-        const MAX_DEPTH = 50;
-        const MIN_SAMPLES = 1;
-
-        // ==================== Random Forest Classes ====================
-        class TreeNode {
-            constructor() {
-                this.isLeaf = false;
-                this.featureIndex = -1;
-                this.threshold = 0;
-                this.prediction = 0;
-                this.classLabel = 0;
-                this.impurity = 0;
-                this.numSamples = 0;
-                this.left = null;
-                this.right = null;
-            }
+  class DecisionTree {
+    constructor(params, features, targets) {
+      this.maxDepth = params.maxDepth;
+      this.minSamplesLeaf = params.minSamplesLeaf;
+      this.minSamplesSplit = params.minSamplesSplit;
+      this.maxFeatures = params.maxFeatures;
+      this.criterion = params.criterion;
+      this.taskType = params.taskType;
+      this.numFeatures = params.numFeatures;
+      this.numSamples = params.numSamples;
+      this.features = features;
+      this.targets = targets;
+      this.root = null;
+    }
+    fit(indices, depth=0) {
+      const node = new TreeNode();
+      node.numSamples = indices.length;
+      node.impurity = this.calculateImpurity(indices);
+      if (this.shouldStop(depth, indices.length, node.impurity)) {
+        node.isLeaf = true;
+        if (this.taskType==='classification')
+          node.classLabel = this.getMajorityClass(indices),
+          node.prediction = node.classLabel;
+        else
+          node.prediction = this.getMeanTarget(indices),
+          node.classLabel = Math.round(node.prediction);
+        return node;
+      }
+      // select feature subset
+      const featureSet = range(this.numFeatures);
+      shuffle(featureSet);
+      const chosenFeatures = featureSet.slice(0, this.maxFeatures||this.numFeatures);
+      // find best split
+      const split = this.findBestSplit(indices, chosenFeatures);
+      if (!split) {
+        // create leaf
+        node.isLeaf = true;
+        if (this.taskType==='classification')
+          node.classLabel = this.getMajorityClass(indices),
+          node.prediction = node.classLabel;
+        else
+          node.prediction = this.getMeanTarget(indices),
+          node.classLabel = Math.round(node.prediction);
+        return node;
+      }
+      node.featureIndex = split.bestFeature;
+      node.threshold = split.bestThreshold;
+      node.left = this.fit(split.leftIndices, depth+1);
+      node.right = this.fit(split.rightIndices, depth+1);
+      return node;
+    }
+    shouldStop(depth, nIdx, impurity) {
+      return depth>=this.maxDepth || nIdx<this.minSamplesSplit || nIdx<=this.minSamplesLeaf || impurity<1e-10;
+    }
+    getMajorityClass(indices) {
+      const counts = {};
+      for (const idx of indices) {
+        const label = Math.round(this.targets[idx]);
+        counts[label] = (counts[label]||0)+1;
+      }
+      return Object.entries(counts).sort((a,b)=>b[1]-a[1])[0][0];
+    }
+    getMeanTarget(indices) {
+      let sum=0; for (const idx of indices) sum += this.targets[idx];
+      return sum/indices.length;
+    }
+    calculateImpurity(indices) {
+      if (this.criterion==='gini') return this.calculateGini(indices);
+      if (this.criterion==='entropy') return this.calculateEntropy(indices);
+      if (this.criterion==='mse') return this.calculateMSE(indices);
+      return this.calculateGini(indices);
+    }
+    calculateGini(indices) {
+      const counts = {};
+      for (const idx of indices) {
+        const label = Math.round(this.targets[idx]);
+        counts[label] = (counts[label]||0)+1;
+      }
+      const n = indices.length;
+      let gini=1;
+      Object.values(counts).forEach(cnt=>{
+        const p=cnt/n;
+        gini-=p*p;
+      });
+      return gini;
+    }
+    calculateEntropy(indices) {
+      const counts = {};
+      for (const idx of indices) {
+        const label = Math.round(this.targets[idx]);
+        counts[label] = (counts[label]||0)+1;
+      }
+      const n = indices.length;
+      let entropy=0;
+      Object.values(counts).forEach(cnt=>{
+        const p=cnt/n;
+        entropy-=p>0?p*Math.log2(p):0;
+      });
+      return entropy;
+    }
+    calculateMSE(indices) {
+      const n = indices.length, mean = this.getMeanTarget(indices);
+      let mse=0; for (const idx of indices) mse += (this.targets[idx]-mean)**2;
+      return mse/n;
+    }
+    findBestSplit(indices, features) {
+      let bestGain = -Infinity, bestFeature=-1, bestThreshold=0, bestLeft=[], bestRight=[];
+      const parentImpurity = this.calculateImpurity(indices);
+      for (const feat of features) {
+        const values = indices.map(idx=>this.features[idx][feat]);
+        const sorted = [...values].sort((a,b)=>a-b);
+        for (let i=0; i<sorted.length-1; i++) {
+          if (sorted[i]===sorted[i+1]) continue;
+          const threshold = (sorted[i]+sorted[i+1])/2;
+          const left=[], right=[];
+          for (const idx of indices) {
+            if (this.features[idx][feat]<=threshold) left.push(idx); else right.push(idx);
+          }
+          if (left.length<this.minSamplesLeaf||right.length<this.minSamplesLeaf) continue;
+          const leftImp = this.calculateImpurity(left), rightImp = this.calculateImpurity(right);
+          const gain = parentImpurity - (left.length/indices.length)*leftImp - (right.length/indices.length)*rightImp;
+          if (gain>bestGain) {
+            bestGain = gain; bestFeature=feat; bestThreshold=threshold; bestLeft=left; bestRight=right;
+          }
         }
-
-        class DecisionTree {
-            constructor(config) {
-                this.root = null;
-                this.maxDepth = config.maxDepth || 10;
-                this.minSamplesLeaf = config.minSamplesLeaf || 1;
-                this.minSamplesSplit = config.minSamplesSplit || 2;
-                this.maxFeatures = config.maxFeatures || null;
-                this.taskType = config.taskType || 'classification';
-                this.criterion = config.criterion || 'gini';
-                this.oobIndices = [];
-            }
-
-            calculateGini(targets, indices) {
-                const counts = {};
-                for (const idx of indices) {
-                    const label = targets[idx];
-                    counts[label] = (counts[label] || 0) + 1;
-                }
-                let gini = 1.0;
-                const total = indices.length;
-                for (const count of Object.values(counts)) {
-                    const prob = count / total;
-                    gini -= prob * prob;
-                }
-                return gini;
-            }
-
-            calculateEntropy(targets, indices) {
-                const counts = {};
-                for (const idx of indices) {
-                    const label = targets[idx];
-                    counts[label] = (counts[label] || 0) + 1;
-                }
-                let entropy = 0;
-                const total = indices.length;
-                for (const count of Object.values(counts)) {
-                    if (count > 0) {
-                        const prob = count / total;
-                        entropy -= prob * Math.log2(prob);
-                    }
-                }
-                return entropy;
-            }
-
-            calculateMSE(targets, indices) {
-                const values = indices.map(i => targets[i]);
-                const mean = values.reduce((a, b) => a + b, 0) / values.length;
-                return values.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / values.length;
-            }
-
-            calculateImpurity(targets, indices) {
-                if (this.criterion === 'gini') return this.calculateGini(targets, indices);
-                if (this.criterion === 'entropy') return this.calculateEntropy(targets, indices);
-                return this.calculateMSE(targets, indices);
-            }
-
-            findBestSplit(data, targets, indices, featureSubset) {
-                let bestGain = 0;
-                let bestFeature = -1;
-                let bestThreshold = 0;
-                const parentImpurity = this.calculateImpurity(targets, indices);
-
-                for (const feat of featureSubset) {
-                    const values = indices.map(i => data[i][feat]).sort((a, b) => a - b);
-                    const uniqueVals = [...new Set(values)];
-
-                    for (let i = 0; i < uniqueVals.length - 1; i++) {
-                        const threshold = (uniqueVals[i] + uniqueVals[i + 1]) / 2;
-                        const leftIndices = indices.filter(idx => data[idx][feat] <= threshold);
-                        const rightIndices = indices.filter(idx => data[idx][feat] > threshold);
-
-                        if (leftIndices.length < this.minSamplesLeaf || rightIndices.length < this.minSamplesLeaf) continue;
-
-                        const leftImpurity = this.calculateImpurity(targets, leftIndices);
-                        const rightImpurity = this.calculateImpurity(targets, rightIndices);
-                        const gain = parentImpurity - (leftIndices.length / indices.length) * leftImpurity -
-                            (rightIndices.length / indices.length) * rightImpurity;
-
-                        if (gain > bestGain) {
-                            bestGain = gain;
-                            bestFeature = feat;
-                            bestThreshold = threshold;
-                        }
-                    }
-                }
-                return { bestFeature, bestThreshold, bestGain };
-            }
-
-            getMajorityClass(targets, indices) {
-                const counts = {};
-                for (const idx of indices) {
-                    const label = targets[idx];
-                    counts[label] = (counts[label] || 0) + 1;
-                }
-                return parseInt(Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b));
-            }
-
-            getMean(targets, indices) {
-                return indices.reduce((sum, idx) => sum + targets[idx], 0) / indices.length;
-            }
-
-            buildTree(data, targets, indices, depth, featureSubset) {
-                const node = new TreeNode();
-                node.numSamples = indices.length;
-                node.impurity = this.calculateImpurity(targets, indices);
-
-                if (depth >= this.maxDepth || indices.length < this.minSamplesSplit || node.impurity < 1e-10) {
-                    node.isLeaf = true;
-                    if (this.taskType === 'classification') {
-                        node.classLabel = this.getMajorityClass(targets, indices);
-                        node.prediction = node.classLabel;
-                    } else {
-                        node.prediction = this.getMean(targets, indices);
-                    }
-                    return node;
-                }
-
-                const { bestFeature, bestThreshold, bestGain } = this.findBestSplit(data, targets, indices, featureSubset);
-
-                if (bestGain === 0) {
-                    node.isLeaf = true;
-                    if (this.taskType === 'classification') {
-                        node.classLabel = this.getMajorityClass(targets, indices);
-                        node.prediction = node.classLabel;
-                    } else {
-                        node.prediction = this.getMean(targets, indices);
-                    }
-                    return node;
-                }
-
-                node.featureIndex = bestFeature;
-                node.threshold = bestThreshold;
-                const leftIndices = indices.filter(idx => data[idx][bestFeature] <= bestThreshold);
-                const rightIndices = indices.filter(idx => data[idx][bestFeature] > bestThreshold);
-
-                node.left = this.buildTree(data, targets, leftIndices, depth + 1, featureSubset);
-                node.right = this.buildTree(data, targets, rightIndices, depth + 1, featureSubset);
-                return node;
-            }
-
-            predictSample(node, sample) {
-                if (!node) return 0;
-                if (node.isLeaf) return node.prediction;
-                if (sample[node.featureIndex] <= node.threshold) {
-                    return this.predictSample(node.left, sample);
-                }
-                return this.predictSample(node.right, sample);
-            }
-
-            predict(sample) {
-                return this.predictSample(this.root, sample);
-            }
-        }
-
-        class RandomForest {
-            constructor(config) {
-                this.numTrees = config.numTrees || 10;
-                this.maxDepth = config.maxDepth || 10;
-                this.minSamplesLeaf = config.minSamplesLeaf || 1;
-                this.minSamplesSplit = config.minSamplesSplit || 2;
-                this.maxFeatures = config.maxFeatures || null;
-                this.taskType = config.taskType || 'classification';
-                this.criterion = config.criterion || 'gini';
-                this.randomSeed = config.randomSeed || 42;
-                this.trees = [];
-                this.featureImportances = [];
-                this.data = [];
-                this.targets = [];
-                this.rng = this.seededRandom(this.randomSeed);
-            }
-
-            seededRandom(seed) {
-                return function() {
-                    seed = (seed * 9301 + 49297) % 233280;
-                    return seed / 233280;
-                };
-            }
-
-            bootstrap(n) {
-                const indices = [];
-                const oobMask = new Array(n).fill(true);
-                for (let i = 0; i < n; i++) {
-                    const idx = Math.floor(this.rng() * n);
-                    indices.push(idx);
-                    oobMask[idx] = false;
-                }
-                return { indices, oobMask };
-            }
-
-            selectFeatures(numFeatures) {
-                const maxFeat = this.maxFeatures || Math.floor(Math.sqrt(numFeatures));
-                const features = Array.from({ length: numFeatures }, (_, i) => i);
-                for (let i = features.length - 1; i > 0; i--) {
-                    const j = Math.floor(this.rng() * (i + 1));
-                    [features[i], features[j]] = [features[j], features[i]];
-                }
-                return features.slice(0, maxFeat);
-            }
-
-            fit(data, targets) {
-                this.data = data;
-                this.targets = targets;
-                this.trees = [];
-                this.featureImportances = new Array(data[0].length).fill(0);
-
-                for (let i = 0; i < this.numTrees; i++) {
-                    const { indices, oobMask } = this.bootstrap(data.length);
-                    const featureSubset = this.selectFeatures(data[0].length);
-                    const tree = new DecisionTree({
-                        maxDepth: this.maxDepth,
-                        minSamplesLeaf: this.minSamplesLeaf,
-                        minSamplesSplit: this.minSamplesSplit,
-                        taskType: this.taskType,
-                        criterion: this.criterion
-                    });
-                    tree.oobIndices = oobMask;
-                    tree.root = tree.buildTree(data, targets, indices, 0, featureSubset);
-                    this.trees.push(tree);
-                }
-            }
-
-            predict(sample) {
-                if (this.taskType === 'classification') {
-                    const votes = {};
-                    for (const tree of this.trees) {
-                        const pred = Math.round(tree.predict(sample));
-                        votes[pred] = (votes[pred] || 0) + 1;
-                    }
-                    return parseInt(Object.keys(votes).reduce((a, b) => votes[a] > votes[b] ? a : b));
-                } else {
-                    const sum = this.trees.reduce((s, tree) => s + tree.predict(sample), 0);
-                    return sum / this.trees.length;
-                }
-            }
-
-            calculateOOBError() {
-                const predictions = new Array(this.data.length).fill(0);
-                const counts = new Array(this.data.length).fill(0);
-                const votes = this.data.map(() => ({}));
-
-                for (let t = 0; t < this.trees.length; t++) {
-                    for (let i = 0; i < this.data.length; i++) {
-                        if (this.trees[t].oobIndices[i]) {
-                            const pred = this.trees[t].predict(this.data[i]);
-                            if (this.taskType === 'classification') {
-                                const label = Math.round(pred);
-                                votes[i][label] = (votes[i][label] || 0) + 1;
-                            } else {
-                                predictions[i] += pred;
-                            }
-                            counts[i]++;
-                        }
-                    }
-                }
-
-                let error = 0;
-                let total = 0;
-                for (let i = 0; i < this.data.length; i++) {
-                    if (counts[i] > 0) {
-                        if (this.taskType === 'classification') {
-                            const pred = parseInt(Object.keys(votes[i]).reduce((a, b) => votes[i][a] > votes[i][b] ? a : b));
-                            if (pred !== this.targets[i]) error++;
-                        } else {
-                            const pred = predictions[i] / counts[i];
-                            error += Math.pow(pred - this.targets[i], 2);
-                        }
-                        total++;
-                    }
-                }
-                return total > 0 ? error / total : 0;
-            }
-        }
-
-        // ==================== Facade Class ====================
-        class RandomForestFacade {
-            constructor(forest) {
-                this.forest = forest;
-            }
-
-            getTreeInfo(treeIdx) {
-                if (treeIdx < 0 || treeIdx >= this.forest.trees.length) return null;
-                const tree = this.forest.trees[treeIdx];
-                return {
-                    treeId: treeIdx,
-                    maxDepth: this.getTreeDepth(tree.root),
-                    numNodes: this.countNodes(tree.root),
-                    numLeaves: this.countLeaves(tree.root),
-                    criterion: tree.criterion
-                };
-            }
-
-            getTreeDepth(node) {
-                if (!node) return 0;
-                if (node.isLeaf) return 1;
-                return 1 + Math.max(this.getTreeDepth(node.left), this.getTreeDepth(node.right));
-            }
-
-            countNodes(node) {
-                if (!node) return 0;
-                return 1 + this.countNodes(node.left) + this.countNodes(node.right);
-            }
-
-            countLeaves(node) {
-                if (!node) return 0;
-                if (node.isLeaf) return 1;
-                return this.countLeaves(node.left) + this.countLeaves(node.right);
-            }
-
-            findNode(node, nodeIdx, currentIdx = { value: 0 }) {
-                if (!node) return null;
-                if (currentIdx.value === nodeIdx) return node;
-                currentIdx.value++;
-                const leftResult = this.findNode(node.left, nodeIdx, currentIdx);
-                if (leftResult) return leftResult;
-                return this.findNode(node.right, nodeIdx, currentIdx);
-            }
-
-            getNodeDetails(treeIdx, nodeIdx) {
-                if (treeIdx < 0 || treeIdx >= this.forest.trees.length) return null;
-                const tree = this.forest.trees[treeIdx];
-                const node = this.findNode(tree.root, nodeIdx);
-                if (!node) return null;
-                return {
-                    isLeaf: node.isLeaf,
-                    featureIndex: node.featureIndex,
-                    threshold: node.threshold,
-                    prediction: node.prediction,
-                    classLabel: node.classLabel,
-                    impurity: node.impurity,
-                    numSamples: node.numSamples
-                };
-            }
-
-            modifySplit(treeIdx, nodeIdx, newThreshold) {
-                if (treeIdx < 0 || treeIdx >= this.forest.trees.length) return false;
-                const tree = this.forest.trees[treeIdx];
-                const node = this.findNode(tree.root, nodeIdx);
-                if (!node || node.isLeaf) return false;
-                node.threshold = newThreshold;
-                return true;
-            }
-
-            modifyLeafValue(treeIdx, nodeIdx, newValue) {
-                if (treeIdx < 0 || treeIdx >= this.forest.trees.length) return false;
-                const tree = this.forest.trees[treeIdx];
-                const node = this.findNode(tree.root, nodeIdx);
-                if (!node || !node.isLeaf) return false;
-                node.prediction = newValue;
-                node.classLabel = Math.round(newValue);
-                return true;
-            }
-
-            pruneNode(treeIdx, nodeIdx) {
-                if (treeIdx < 0 || treeIdx >= this.forest.trees.length) return false;
-                const tree = this.forest.trees[treeIdx];
-                const node = this.findNode(tree.root, nodeIdx);
-                if (!node || node.isLeaf) return false;
-                node.left = null;
-                node.right = null;
-                node.isLeaf = true;
-                return true;
-            }
-
-            convertToLeaf(treeIdx, nodeIdx, leafValue) {
-                if (treeIdx < 0 || treeIdx >= this.forest.trees.length) return false;
-                const tree = this.forest.trees[treeIdx];
-                const node = this.findNode(tree.root, nodeIdx);
-                if (!node) return false;
-                node.left = null;
-                node.right = null;
-                node.isLeaf = true;
-                node.prediction = leafValue;
-                node.classLabel = Math.round(leafValue);
-                node.featureIndex = -1;
-                node.threshold = 0;
-                return true;
-            }
-
-            visualizeTree(treeIdx) {
-                if (treeIdx < 0 || treeIdx >= this.forest.trees.length) return '';
-                const tree = this.forest.trees[treeIdx];
-                return this.visualizeNode(tree.root, 0);
-            }
-
-            visualizeNode(node, depth) {
-                if (!node) return '';
-                const indent = '  '.repeat(depth);
-                if (node.isLeaf) {
-                    return `${indent}[Leaf] -> ${node.prediction.toFixed(2)} (n=${node.numSamples})\n`;
-                }
-                let result = `${indent}[Split] Feature ${node.featureIndex} <= ${node.threshold.toFixed(4)} (n=${node.numSamples}, imp=${node.impurity.toFixed(4)})\n`;
-                result += this.visualizeNode(node.left, depth + 1);
-                result += this.visualizeNode(node.right, depth + 1);
-                return result;
-            }
-
-            addTree() {
-                if (!this.forest.data.length) return false;
-                const { indices } = this.forest.bootstrap(this.forest.data.length);
-                const featureSubset = this.forest.selectFeatures(this.forest.data[0].length);
-                const tree = new DecisionTree({
-                    maxDepth: this.forest.maxDepth,
-                    minSamplesLeaf: this.forest.minSamplesLeaf,
-                    minSamplesSplit: this.forest.minSamplesSplit,
-                    taskType: this.forest.taskType,
-                    criterion: this.forest.criterion
-                });
-                tree.root = tree.buildTree(this.forest.data, this.forest.targets, indices, 0, featureSubset);
-                this.forest.trees.push(tree);
-                return true;
-            }
-
-            removeTree(treeIdx) {
-                if (treeIdx < 0 || treeIdx >= this.forest.trees.length) return false;
-                this.forest.trees.splice(treeIdx, 1);
-                return true;
-            }
-
-            retrainTree(treeIdx) {
-                if (treeIdx < 0 || treeIdx >= this.forest.trees.length) return false;
-                if (!this.forest.data.length) return false;
-                const { indices, oobMask } = this.forest.bootstrap(this.forest.data.length);
-                const featureSubset = this.forest.selectFeatures(this.forest.data[0].length);
-                const tree = this.forest.trees[treeIdx];
-                tree.oobIndices = oobMask;
-                tree.root = tree.buildTree(this.forest.data, this.forest.targets, indices, 0, featureSubset);
-                return true;
-            }
-
-            getFeatureImportance() {
-                // Simplified feature importance based on usage frequency
-                const importance = new Array(this.forest.data[0]?.length || 0).fill(0);
-                for (const tree of this.forest.trees) {
-                    this.collectFeatureUsage(tree.root, importance);
-                }
-                const total = importance.reduce((a, b) => a + b, 0);
-                return total > 0 ? importance.map(v => v / total) : importance;
-            }
-
-            collectFeatureUsage(node, importance) {
-                if (!node || node.isLeaf) return;
-                importance[node.featureIndex]++;
-                this.collectFeatureUsage(node.left, importance);
-                this.collectFeatureUsage(node.right, importance);
-            }
-        }
-
-        // ==================== Global Variables ====================
-        let forest = null;
-        let facade = null;
-        let trainData = [];
-        let trainTargets = [];
-
-        // ==================== UI Functions ====================
-        function createForest() {
-            const config = {
-                numTrees: parseInt(document.getElementById('numTrees').value),
-                maxDepth: parseInt(document.getElementById('maxDepth').value),
-                minSamplesLeaf: parseInt(document.getElementById('minSamplesLeaf').value),
-                minSamplesSplit: parseInt(document.getElementById('minSamplesSplit').value),
-                taskType: document.getElementById('taskType').value,
-                criterion: document.getElementById('criterion').value,
-                randomSeed: parseInt(document.getElementById('randomSeed').value)
-                };
-            forest = new RandomForest(config);
-            facade = new RandomForestFacade(forest);
-            document.getElementById('forestStatus').textContent = '✓ Forest created';
-            document.getElementById('forestStatus').style.color = 'green';
-        }
-
-        function generateData() {
-            const samplesPerClass = parseInt(document.getElementById('samplesPerClass').value);
-            const numFeatures = parseInt(document.getElementById('numFeatures').value);
-            const numClasses = parseInt(document.getElementById('numClasses').value);
-
-            trainData = [];
-            trainTargets = [];
-
-            for (let cls = 0; cls < numClasses; cls++) {
-                const centerOffset = cls * 2;
-                for (let i = 0; i < samplesPerClass; i++) {
-                    const sample = [];
-                    for (let f = 0; f < numFeatures; f++) {
-                        sample.push(centerOffset + (Math.random() - 0.5) * 2);
-                    }
-                    trainData.push(sample);
-                    trainTargets.push(cls);
-                }
-            }
-
-            document.getElementById('dataStatus').textContent =
-                `✓ Generated ${trainData.length} samples with ${numFeatures} features`;
-            document.getElementById('dataStatus').style.color = 'green';
-        }
-
-        function trainForest() {
-            if (!forest) {
-                alert('Please create forest first');
-                return;
-            }
-            if (!trainData.length) {
-                alert('Please generate data first');
-                return;
-            }
-
-            const progressBar = document.getElementById('trainProgressBar');
-            const progressFill = document.getElementById('trainProgressFill');
-            progressBar.style.display = 'block';
-            progressFill.style.width = '0%';
-
-            document.getElementById('trainStatus').textContent = 'Training...';
-
-            setTimeout(() => {
-                const startTime = Date.now();
-                forest.fit(trainData, trainTargets);
-                const endTime = Date.now();
-
-                progressFill.style.width = '100%';
-
-                const predictions = trainData.map(s => forest.predict(s));
-                const correct = predictions.filter((p, i) => p === trainTargets[i]).length;
-                const accuracy = correct / trainData.length;
-                const oobError = forest.calculateOOBError();
-
-                document.getElementById('trainStatus').textContent = '✓ Training complete';
-                document.getElementById('trainStatus').style.color = 'green';
-
-                const results = document.getElementById('trainResults');
-                results.style.display = 'block';
-                results.innerHTML = `
-                    <div class="metric">Training Accuracy: ${(accuracy * 100).toFixed(2)}%</div>
-                    <div class="metric">OOB Error: ${oobError.toFixed(4)}</div>
-                    <div class="metric">Training Time: ${endTime - startTime}ms</div>
-                    <div class="metric">Number of Trees: ${forest.trees.length}</div>
-                    <div class="metric">Samples: ${trainData.length}</div>
-                `;
-
-                setTimeout(() => {
-                    progressBar.style.display = 'none';
-                }, 1000);
-            }, 100);
-        }
-
-        function predict() {
-            if (!forest || !forest.trees.length) {
-                alert('Please train forest first');
-                return;
-            }
-
-            const inputStr = document.getElementById('predictInput').value;
-            const sample = inputStr.split(',').map(v => parseFloat(v.trim()));
-
-            if (sample.some(isNaN)) {
-                alert('Invalid input format');
-                return;
-            }
-
-            const prediction = forest.predict(sample);
-            const output = document.getElementById('predictOutput');
-            output.innerHTML = `<div class="metric">Prediction: ${prediction.toFixed(4)}</div>`;
-        }
-
-        // ==================== Facade Functions ====================
-        function facadeOutput(text) {
-            document.getElementById('facadeOutput').textContent = text;
-        }
-
-        function facadeGetTreeInfo() {
-            if (!facade) {
-                facadeOutput('Error: Forest not created');
-                return;
-            }
-            const idx = parseInt(document.getElementById('facadeTreeIdx').value);
-            const info = facade.getTreeInfo(idx);
-            if (!info) {
-                facadeOutput(`Error: Invalid tree index ${idx}`);
-                return;
-            }
-            facadeOutput(
-                `Tree ${info.treeId} Info:\n` +
-                `Max Depth: ${info.maxDepth}\n` +
-                `Num Nodes: ${info.numNodes}\n` +
-                `Num Leaves: ${info.numLeaves}\n` +
-                `Criterion: ${info.criterion}`
-            );
-        }
-
-        function facadeGetTreeDepth() {
-            if (!facade) {
-                facadeOutput('Error: Forest not created');
-                return;
-            }
-            const idx = parseInt(document.getElementById('facadeTreeIdx').value);
-            const info = facade.getTreeInfo(idx);
-            if (!info) {
-                facadeOutput(`Error: Invalid tree index ${idx}`);
-                return;
-            }
-            facadeOutput(`Tree ${idx} Depth: ${info.maxDepth}`);
-        }
-
-        function facadeGetTreeNumNodes() {
-            if (!facade) {
-                facadeOutput('Error: Forest not created');
-                return;
-            }
-            const idx = parseInt(document.getElementById('facadeTreeIdx').value);
-            const info = facade.getTreeInfo(idx);
-            if (!info) {
-                facadeOutput(`Error: Invalid tree index ${idx}`);
-                return;
-            }
-            facadeOutput(`Tree ${idx} Num Nodes: ${info.numNodes}`);
-        }
-
-        function facadeGetTreeNumLeaves() {
-            if (!facade) {
-                facadeOutput('Error: Forest not created');
-                return;
-            }
-            const idx = parseInt(document.getElementById('facadeTreeIdx').value);
-            const info = facade.getTreeInfo(idx);
-            if (!info) {
-                facadeOutput(`Error: Invalid tree index ${idx}`);
-                return;
-            }
-            facadeOutput(`Tree ${idx} Num Leaves: ${info.numLeaves}`);
-        }
-
-        function facadeVisualizeTree() {
-            if (!facade) {
-                facadeOutput('Error: Forest not created');
-                return;
-            }
-            const idx = parseInt(document.getElementById('facadeTreeIdx').value);
-            const viz = facade.visualizeTree(idx);
-            if (!viz) {
-                facadeOutput(`Error: Invalid tree index ${idx}`);
-                return;
-            }
-            facadeOutput(viz);
-        }
-
-        function facadeGetNodeDetails() {
-            if (!facade) {
-                facadeOutput('Error: Forest not created');
-                return;
-            }
-            const treeIdx = parseInt(document.getElementById('facadeTreeIdx').value);
-            const nodeIdx = parseInt(document.getElementById('facadeNodeIdx').value);
-            const details = facade.getNodeDetails(treeIdx, nodeIdx);
-            if (!details) {
-                facadeOutput(`Error: Invalid tree/node index`);
-                return;
-            }
-            facadeOutput(
-                `Node ${nodeIdx} Details:\n` +
-                `Is Leaf: ${details.isLeaf}\n` +
-                `Feature Index: ${details.featureIndex}\n` +
-                `Threshold: ${details.threshold.toFixed(4)}\n` +
-                `Prediction: ${details.prediction.toFixed(4)}\n` +
-                `Class Label: ${details.classLabel}\n` +
-                `Impurity: ${details.impurity.toFixed(4)}\n` +
-                `Num Samples: ${details.numSamples}`
-            );
-        }
-
-        function facadeIsLeaf() {
-            if (!facade) {
-                facadeOutput('Error: Forest not created');
-                return;
-            }
-            const treeIdx = parseInt(document.getElementById('facadeTreeIdx').value);
-            const nodeIdx = parseInt(document.getElementById('facadeNodeIdx').value);
-            const details = facade.getNodeDetails(treeIdx, nodeIdx);
-            if (!details) {
-                facadeOutput(`Error: Invalid tree/node index`);
-                return;
-            }
-            facadeOutput(`Node ${nodeIdx} is leaf: ${details.isLeaf}`);
-        }
-
-        function facadeGetFeatureIndex() {
-            if (!facade) {
-                facadeOutput('Error: Forest not created');
-                return;
-            }
-            const treeIdx = parseInt(document.getElementById('facadeTreeIdx').value);
-            const nodeIdx = parseInt(document.getElementById('facadeNodeIdx').value);
-            const details = facade.getNodeDetails(treeIdx, nodeIdx);
-            if (!details) {
-                facadeOutput(`Error: Invalid tree/node index`);
-                return;
-            }
-            facadeOutput(`Node ${nodeIdx} feature index: ${details.featureIndex}`);
-        }
-
-        function facadeGetThreshold() {
-            if (!facade) {
-                facadeOutput('Error: Forest not created');
-                return;
-            }
-            const treeIdx = parseInt(document.getElementById('facadeTreeIdx').value);
-            const nodeIdx = parseInt(document.getElementById('facadeNodeIdx').value);
-            const details = facade.getNodeDetails(treeIdx, nodeIdx);
-            if (!details) {
-                facadeOutput(`Error: Invalid tree/node index`);
-                return;
-            }
-            facadeOutput(`Node ${nodeIdx} threshold: ${details.threshold.toFixed(4)}`);
-        }
-
-        function facadeGetPrediction() {
-            if (!facade) {
-                facadeOutput('Error: Forest not created');
-                return;
-            }
-            const treeIdx = parseInt(document.getElementById('facadeTreeIdx').value);
-            const nodeIdx = parseInt(document.getElementById('facadeNodeIdx').value);
-            const details = facade.getNodeDetails(treeIdx, nodeIdx);
-            if (!details) {
-                facadeOutput(`Error: Invalid tree/node index`);
-                return;
-            }
-            facadeOutput(`Node ${nodeIdx} prediction: ${details.prediction.toFixed(4)}`);
-        }
-
-        function facadeGetImpurity() {
-            if (!facade) {
-                facadeOutput('Error: Forest not created');
-                return;
-            }
-            const treeIdx = parseInt(document.getElementById('facadeTreeIdx').value);
-            const nodeIdx = parseInt(document.getElementById('facadeNodeIdx').value);
-            const details = facade.getNodeDetails(treeIdx, nodeIdx);
-            if (!details) {
-                facadeOutput(`Error: Invalid tree/node index`);
-                return;
-            }
-            facadeOutput(`Node ${nodeIdx} impurity: ${details.impurity.toFixed(4)}`);
-        }
-
-        function facadeModifySplit() {
-            if (!facade) {
-                facadeOutput('Error: Forest not created');
-                return;
-            }
-            const treeIdx = parseInt(document.getElementById('facadeTreeIdx').value);
-            const nodeIdx = parseInt(document.getElementById('facadeNodeIdx').value);
-            const newThreshold = parseFloat(document.getElementById('newThreshold').value);
-            const success = facade.modifySplit(treeIdx, nodeIdx, newThreshold);
-            facadeOutput(success ?
-                `✓ Modified split at tree ${treeIdx}, node ${nodeIdx} to threshold ${newThreshold.toFixed(4)}` :
-                `Error: Could not modify split`);
-        }
-
-        function facadeModifyLeaf() {
-            if (!facade) {
-                facadeOutput('Error: Forest not created');
-                return;
-            }
-            const treeIdx = parseInt(document.getElementById('facadeTreeIdx').value);
-            const nodeIdx = parseInt(document.getElementById('facadeNodeIdx').value);
-            const newValue = parseFloat(document.getElementById('newLeafValue').value);
-            const success = facade.modifyLeafValue(treeIdx, nodeIdx, newValue);
-            facadeOutput(success ?
-                `✓ Modified leaf value at tree ${treeIdx}, node ${nodeIdx} to ${newValue.toFixed(4)}` :
-                `Error: Could not modify leaf (is it a leaf node?)`);
-        }
-
-        function facadePruneNode() {
-            if (!facade) {
-                facadeOutput('Error: Forest not created');
-                return;
-            }
-            const treeIdx = parseInt(document.getElementById('facadeTreeIdx').value);
-            const nodeIdx = parseInt(document.getElementById('facadeNodeIdx').value);
-            const success = facade.pruneNode(treeIdx, nodeIdx);
-            facadeOutput(success ?
-                `✓ Pruned node ${nodeIdx} in tree ${treeIdx}` :
-                `Error: Could not prune node`);
-        }
-
-        function facadeConvertToLeaf() {
-            if (!facade) {
-                facadeOutput('Error: Forest not created');
-                return;
-            }
-            const treeIdx = parseInt(document.getElementById('facadeTreeIdx').value);
-            const nodeIdx = parseInt(document.getElementById('facadeNodeIdx').value);
-            const newValue = parseFloat(document.getElementById('newLeafValue').value);
-            const success = facade.convertToLeaf(treeIdx, nodeIdx, newValue);
-            facadeOutput(success ?
-                `✓ Converted node ${nodeIdx} in tree ${treeIdx} to leaf with value ${newValue.toFixed(4)}` :
-                `Error: Could not convert to leaf`);
-        }
-
-        function facadeAddTree() {
-            if (!facade) {
-                facadeOutput('Error: Forest not created');
-                return;
-            }
-            const success = facade.addTree();
-            facadeOutput(success ?
-                `✓ Added new tree. Total trees: ${forest.trees.length}` :
-                `Error: Could not add tree (no training data?)`);
-        }
-
-        function facadeRemoveTree() {
-            if (!facade) {
-                facadeOutput('Error: Forest not created');
-                return;
-            }
-            const idx = parseInt(document.getElementById('facadeTreeIdx').value);
-            const success = facade.removeTree(idx);
-            facadeOutput(success ?
-                `✓ Removed tree ${idx}. Total trees: ${forest.trees.length}` :
-                `Error: Could not remove tree`);
-        }
-
-        function facadeRetrainTree() {
-            if (!facade) {
-                facadeOutput('Error: Forest not created');
-                return;
-            }
-            const idx = parseInt(document.getElementById('facadeTreeIdx').value);
-            const success = facade.retrainTree(idx);
-            facadeOutput(success ?
-                `✓ Retrained tree ${idx}` :
-                `Error: Could not retrain tree`);
-        }
-
-        function facadeGetNumTrees() {
-            if (!facade) {
-                facadeOutput('Error: Forest not created');
-                return;
-            }
-            facadeOutput(`Number of trees: ${forest.trees.length}`);
-        }
-
-        function facadeGetFeatureImportance() {
-            if (!facade) {
-                facadeOutput('Error: Forest not created');
-                return;
-            }
-            const featureIdx = parseInt(document.getElementById('facadeFeatureIdx').value);
-            const importance = facade.getFeatureImportance();
-            if (featureIdx >= 0 && featureIdx < importance.length) {
-                facadeOutput(`Feature ${featureIdx} importance: ${importance[featureIdx].toFixed(4)}`);
-            } else {
-                let output = 'Feature Importances:\n';
-                importance.forEach((imp, i) => {
-                    output += `Feature ${i}: ${imp.toFixed(4)}\n`;
-                });
-                facadeOutput(output);
-            }
-        }
-
-        function facadeGetFeatureUsage() {
-            if (!facade) {
-                facadeOutput('Error: Forest not created');
-                return;
-            }
-            const importance = facade.getFeatureImportance();
-            let output = 'Feature Usage Summary:\n';
-            importance.forEach((imp, i) => {
-                const usageCount = Math.round(imp * forest.trees.length * 10);
-                output += `Feature ${i}: ${usageCount} occurrences (importance: ${imp.toFixed(4)})\n`;
-            });
-            facadeOutput(output);
-        }
-
-        function facadeShowFeatureHeatmap() {
-            if (!facade) {
-                facadeOutput('Error: Forest not created');
-                return;
-            }
-            const numFeatures = trainData[0]?.length || 0;
-            const usage = Array(numFeatures).fill(0).map(() => Array(forest.trees.length).fill(false));
-
-            forest.trees.forEach((tree, treeIdx) => {
-                const collectUsage = (node) => {
-                    if (!node || node.isLeaf) return;
-                    usage[node.featureIndex][treeIdx] = true;
-                    collectUsage(node.left);
-                    collectUsage(node.right);
-                };
-                collectUsage(tree.root);
-            });
-
-            let output = 'Feature Usage Heatmap:\nFeat  ';
-            for (let t = 0; t < Math.min(forest.trees.length, 20); t++) {
-                output += t < 10 ? t + ' ' : (t % 10) + ' ';
-            }
-            output += '\n' + '-'.repeat(8 + Math.min(forest.trees.length, 20) * 2) + '\n';
-
-            for (let f = 0; f < numFeatures; f++) {
-                output += f.toString().padStart(4) + '  ';
-                for (let t = 0; t < Math.min(forest.trees.length, 20); t++) {
-                    output += usage[f][t] ? 'X ' : '. ';
-                }
-                const total = usage[f].filter(Boolean).length;
-                output += ` ${total}\n`;
-            }
-            facadeOutput(output);
-        }
-
-        function facadeGetOOBError() {
-            if (!facade) {
-                facadeOutput('Error: Forest not created');
-                return;
-            }
-            const oobError = forest.calculateOOBError();
-            facadeOutput(`Global OOB Error: ${oobError.toFixed(4)}`);
-        }
-
-        function facadeGetOOBSummary() {
-            if (!facade) {
-                facadeOutput('Error: Forest not created');
-                return;
-            }
-            let output = 'OOB Summary:\n';
-            output += 'Tree  OOB Samples  OOB Error\n';
-            output += '-'.repeat(35) + '\n';
-
-            forest.trees.forEach((tree, idx) => {
-                const oobCount = tree.oobIndices.filter(Boolean).length;
-                let errors = 0;
-                let total = 0;
-
-                trainData.forEach((sample, i) => {
-                    if (tree.oobIndices[i]) {
-                        const pred = tree.predict(sample);
-                        if (forest.taskType === 'classification') {
-                            if (Math.round(pred) !== trainTargets[i]) errors++;
-                        } else {
-                            errors += Math.pow(pred - trainTargets[i], 2);
-                        }
-                        total++;
-                    }
-                });
-
-                const oobError = total > 0 ? errors / total : 0;
-                output += `${idx.toString().padStart(4)}  ${oobCount.toString().padStart(10)}  ${oobError.toFixed(4)}\n`;
-            });
-
-            facadeOutput(output);
-        }
-
-        function facadeTrackSample() {
-            if (!facade) {
-                facadeOutput('Error: Forest not created');
-                return;
-            }
-            const sampleIdx = parseInt(document.getElementById('sampleIdx').value);
-            if (sampleIdx < 0 || sampleIdx >= trainData.length) {
-                facadeOutput(`Error: Invalid sample index ${sampleIdx}`);
-                return;
-            }
-
-            const sample = trainData[sampleIdx];
-            let output = `Sample ${sampleIdx} Tracking:\n`;
-            output += `Actual Target: ${trainTargets[sampleIdx]}\n\n`;
-            output += 'Tree  In Bootstrap  OOB  Prediction\n';
-            output += '-'.repeat(40) + '\n';
-
-            forest.trees.forEach((tree, idx) => {
-                const isOOB = tree.oobIndices[sampleIdx];
-                const pred = tree.predict(sample);
-                output += `${idx.toString().padStart(4)}  `;
-                output += isOOB ? 'No         ' : 'Yes        ';
-                output += isOOB ? 'Yes  ' : 'No   ';
-                output += `${pred.toFixed(4)}\n`;
-            });
-
-            facadeOutput(output);
-        }
-    </script>
+      }
+      if (bestGain===-Infinity) return null;
+      return {bestFeature, bestThreshold, bestGain, leftIndices:bestLeft, rightIndices:bestRight};
+    }
+    predict(sample) {
+      let node=this.root;
+      while(node && !node.isLeaf) {
+        if (sample[node.featureIndex]<=node.threshold) node=node.left; else node=node.right;
+      }
+      return node?node.prediction:0;
+    }
+  }
+
+  // --- Random Forest ---
+  class RandomForest {
+    constructor(params) {
+      this.numTrees=params.numTrees||10;
+      this.maxDepth=params.maxDepth||5;
+      this.minSamplesLeaf=params.minSamplesLeaf||1;
+      this.minSamplesSplit=params.minSamplesSplit||2;
+      this.maxFeatures=params.maxFeatures||0;
+      this.criterion=params.criterion||'gini';
+      this.taskType=params.taskType||'classification';
+      this.trees=[];
+      this.numFeatures=params.numFeatures||0;
+      this.numSamples=params.numSamples||0;
+      this.features=[];
+      this.targets=[];
+      this.featureImportances=[];
+    }
+    loadData(features, targets, numFeatures, numSamples) {
+      this.features=features;
+      this.targets=targets;
+      this.numFeatures=numFeatures;
+      this.numSamples=numSamples;
+      if (!this.maxFeatures || this.maxFeatures>numFeatures)
+        this.maxFeatures=Math.max(1, this.taskType==='classification'?Math.round(Math.sqrt(numFeatures)):Math.round(numFeatures/3));
+    }
+    fit() {
+      this.trees=[];
+      for (let t=0; t<this.numTrees; t++) {
+        // bootstrap indices
+        const indices=range(this.numSamples).map(()=>Math.floor(Math.random()*this.numSamples));
+        const tree = new DecisionTree(this, this.features, this.targets);
+        tree.root = tree.fit(indices,0);
+        this.trees.push(tree);
+      }
+      // feature importances after training
+      this.featureImportances = this.getFeatureImportances();
+    }
+    predict(sample) {
+      const votes = this.trees.map(tree=>tree.predict(sample));
+      if (this.taskType==='classification') {
+        const counts = {};
+        for (const v of votes) counts[Math.round(v)] = (counts[Math.round(v)]||0)+1;
+        return Object.entries(counts).sort((a,b)=>b[1]-a[1])[0][0];
+      } else {
+        return votes.reduce((a,b)=>a+b,0)/votes.length;
+      }
+    }
+    predictBatch(samples) {
+      return samples.map(s=>this.predict(s));
+    }
+    getFeatureImportances() {
+      // Simple count of splits per feature (can be extended to actual gain)
+      const importances = zeros(this.numFeatures);
+      for (const tree of this.trees) {
+        this._recurseFeatureCount(tree.root,importances);
+      }
+      const sum = importances.reduce((a,b)=>a+b,0);
+      return importances.map(v=>sum>0?v/sum:0);
+    }
+    _recurseFeatureCount(node,arr) {
+      if (!node||node.isLeaf) return;
+      arr[node.featureIndex]++;
+      this._recurseFeatureCount(node.left,arr);
+      this._recurseFeatureCount(node.right,arr);
+    }
+    accuracy(predictions, actual) {
+      let correct=0;
+      for (let i=0; i<predictions.length; i++)
+        if (Math.round(predictions[i])===Math.round(actual[i])) correct++;
+      return correct/predictions.length;
+    }
+    mse(predictions, actual) {
+      let sum=0;
+      for (let i=0; i<predictions.length; i++)
+        sum += (predictions[i]-actual[i])**2;
+      return sum/predictions.length;
+    }
+  }
+
+  // --- Facade ---
+  class RandomForestFacade {
+    constructor() {
+      this.rf = new RandomForest({});
+    }
+    setHyperparameters() {
+      const hp = {
+        numTrees:parseInt(document.getElementById("numTrees").value),
+        maxDepth:parseInt(document.getElementById("maxDepth").value),
+        minSamplesLeaf:parseInt(document.getElementById("minSamplesLeaf").value),
+        minSamplesSplit:parseInt(document.getElementById("minSamplesSplit").value),
+        maxFeatures:parseInt(document.getElementById("maxFeatures").value),
+        criterion:document.getElementById("criterion").value,
+        taskType:document.getElementById("taskType").value,
+      };
+      Object.assign(this.rf,hp);
+      document.getElementById("forestInfo").textContent = "Hyperparameters set.";
+    }
+    loadCSV() {
+      const txt = document.getElementById("csvInput").value;
+      const nFeatures = parseInt(document.getElementById("numFeatures").value);
+      const nSamples = parseInt(document.getElementById("numSamples").value);
+      const rows = parseCSV(txt, nFeatures);
+      const features = rows.map(r=>r.features);
+      const targets = rows.map(r=>r.target);
+      if (features.length===0) { alert("No data!"); return;}
+      this.rf.loadData(features, targets, nFeatures, features.length);
+      document.getElementById("forestInfo").textContent = "Loaded "+features.length+" samples.";
+    }
+    trainForest() {
+      this.rf.fit();
+      document.getElementById("trainStatus").textContent = "Training done. Trees: "+this.rf.trees.length;
+    }
+    predictSample() {
+      const sample = document.getElementById("sampleInput").value.split(',').map(Number);
+      const pred = this.rf.predict(sample);
+      document.getElementById("predictResult").textContent = "Predicted: "+pred;
+    }
+    showFeatureImportances() {
+      const importances = this.rf.featureImportances.map((v,i)=>`Feature${i}: ${v.toFixed(3)}`).join('\n');
+      document.getElementById("featureImportances").textContent = importances;
+    }
+    showForestInfo() {
+      const info = {
+        numTrees: this.rf.trees.length,
+        depth: this.rf.maxDepth,
+        numFeatures: this.rf.numFeatures,
+      };
+      document.getElementById("forestInfo").textContent = JSON.stringify(info,null,2);
+    }
+    inspectTree(treeId=0) {
+      const tree = this.rf.trees[treeId];
+      if (!tree) { document.getElementById("facadeOutput").textContent = "No such tree."; return;}
+      let out="";
+      function recurse(node,depth=0) {
+        if (!node) return;
+        out+= "  ".repeat(depth)+ (node.isLeaf?`Leaf: pred=${node.prediction}`:`Split: x[${node.featureIndex}] <= ${node.threshold.toFixed(4)}`)+"\n";
+        if (!node.isLeaf) { recurse(node.left,depth+1); recurse(node.right,depth+1);}
+      }
+      recurse(tree.root);
+      document.getElementById("facadeOutput").textContent = out;
+    }
+  }
+
+  // --- Facade instance for UI ---
+  const facade = new RandomForestFacade();
+
+  </script>
 </body>
-
 </html>
