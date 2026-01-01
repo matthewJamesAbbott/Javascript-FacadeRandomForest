@@ -1,3 +1,27 @@
+<!--
+MIT License
+
+Copyright (c) 2025 Matthew Abbott
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions: 
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+-->
+
 <!DOCTYPE html>
 <html lang="en">
 
@@ -9,6 +33,7 @@
             font-family: Arial, sans-serif;
             margin: 2rem;
             max-width: 1400px;
+            background: #fafafa;
         }
 
         input,
@@ -18,10 +43,35 @@
             margin: 0.5rem 0;
         }
 
+        button {
+            padding: 8px 16px;
+            cursor: pointer;
+            background: #5a5a5a;
+            color: white;
+            border: none;
+            border-radius: 0;
+        }
+
+        button:hover {
+            background: #4a4a4a;
+        }
+
+        button:active {
+            background: #3a3a3a;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
         .section {
             margin-bottom: 2rem;
             border-bottom: 1px solid #ccc;
             padding-bottom: 1rem;
+            background: #fff;
+            padding: 1rem;
+            border-radius: 8px;
         }
 
         label {
@@ -61,7 +111,7 @@
         .facade-section {
             background-color: #e8f4f8;
             padding: 1rem;
-            border-radius: 5px;
+            border-radius: 8px;
             margin: 1rem 0;
         }
 
@@ -108,16 +158,16 @@
 
         .progress-bar {
             width: 100%;
-            height: 25px;
-            background-color: #f0f0f0;
-            border-radius: 5px;
+            height: 20px;
+            background: #e0e0e0;
+            border-radius: 10px;
             overflow: hidden;
             margin: 0.5rem 0;
         }
 
         .progress-fill {
             height: 100%;
-            background-color: #4CAF50;
+            background: #4285f4;
             transition: width 0.3s;
         }
     </style>
@@ -173,6 +223,21 @@
             <div class="progress-fill" id="trainProgressFill"></div>
         </div>
         <div id="trainResults" class="results" style="display:none;"></div>
+    </div>
+
+    <div class="section">
+        <h2>Forest Architecture</h2>
+        <div id="forestViz"></div>
+    </div>
+
+    <div class="section">
+        <h2>Save/Load Forest</h2>
+        <div class="inline-controls">
+            <button onclick="saveForest()">Save Forest (.json)</button>
+            <button onclick="loadForest()">Load Forest (.json)</button>
+            <input type="file" id="modelFile" accept=".json" style="display:none;">
+            <span id="loadStatus" style="margin-left:1rem;"></span>
+        </div>
     </div>
 
     <div class="section">
@@ -529,6 +594,112 @@
                 }
                 return total > 0 ? error / total : 0;
             }
+            
+            // Convert tree node to plain object for JSON serialization
+            treeNodeToObject(node) {
+                if (!node) return null;
+                
+                const obj = { isLeaf: node.isLeaf };
+                
+                if (node.isLeaf) {
+                    obj.prediction = node.prediction;
+                    obj.classLabel = node.classLabel;
+                } else {
+                    obj.featureIndex = node.featureIndex;
+                    obj.threshold = node.threshold;
+                    obj.impurity = node.impurity;
+                    obj.numSamples = node.numSamples;
+                    obj.left = this.treeNodeToObject(node.left);
+                    obj.right = this.treeNodeToObject(node.right);
+                }
+                
+                return obj;
+            }
+            
+            toJSON() {
+                // Export in Pascal-compatible format (snake_case)
+                const payload = {
+                    num_trees: this.numTrees,
+                    max_depth: this.maxDepth,
+                    min_samples_leaf: this.minSamplesLeaf,
+                    min_samples_split: this.minSamplesSplit,
+                    max_features: this.maxFeatures || 0,
+                    num_features: this.data[0]?.length || 0,
+                    num_samples: this.data.length,
+                    task_type: this.taskType,
+                    criterion: this.criterion,
+                    random_seed: this.randomSeed,
+                    trees: this.trees.map(tree => tree ? this.treeNodeToObject(tree.root) : null)
+                };
+                
+                // Add feature importances if calculated
+                if (this.featureImportances && this.featureImportances.length > 0) {
+                    const hasImportances = this.featureImportances.some(x => x !== 0);
+                    if (hasImportances) {
+                        payload.feature_importances = this.featureImportances.slice();
+                    }
+                }
+                
+                return JSON.stringify(payload);
+            }
+            
+            static fromJSON(json) {
+                const obj = typeof json === "string" ? JSON.parse(json) : json;
+                
+                const config = {
+                    numTrees: obj.num_trees || obj.numTrees || 10,
+                    maxDepth: obj.max_depth || obj.maxDepth || 10,
+                    minSamplesLeaf: obj.min_samples_leaf || obj.minSamplesLeaf || 1,
+                    minSamplesSplit: obj.min_samples_split || obj.minSamplesSplit || 2,
+                    maxFeatures: obj.max_features || obj.maxFeatures || null,
+                    taskType: obj.task_type || obj.taskType || 'classification',
+                    criterion: obj.criterion || 'gini',
+                    randomSeed: obj.random_seed || obj.randomSeed || 42
+                };
+                
+                const rf = new RandomForest(config);
+                rf.numFeatures = obj.num_features || obj.numFeatures || 0;
+                rf.numSamples = obj.num_samples || obj.numSamples || 0;
+                
+                // Load feature importances if present
+                if (obj.feature_importances && Array.isArray(obj.feature_importances)) {
+                    rf.featureImportances = obj.feature_importances.slice();
+                }
+                
+                // Load trees - Pascal stores root nodes directly in the trees array
+                if (obj.trees && Array.isArray(obj.trees)) {
+                    rf.trees = [];
+                    for (let i = 0; i < obj.trees.length; i++) {
+                        const treeData = obj.trees[i];
+                        if (treeData !== null) {
+                            const tree = new DecisionTree(config);
+                            // Pascal format: trees[i] is the root node directly
+                            if (treeData.isLeaf !== undefined || treeData.featureIndex !== undefined) {
+                                tree.root = treeData;
+                            } else if (treeData.root !== undefined) {
+                                tree.root = treeData.root;
+                            }
+                            tree.oobIndices = [];
+                            rf.trees.push(tree);
+                        } else {
+                            const tree = new DecisionTree(config);
+                            tree.root = null;
+                            tree.oobIndices = [];
+                            rf.trees.push(tree);
+                        }
+                    }
+                }
+                
+                return rf;
+            }
+            
+            getNumFeatures() {
+                return this.data[0]?.length || this.numFeatures || 0;
+            }
+            
+            getNumTrees() {
+                return this.trees.filter(t => t && t.root).length;
+            }
         }
 
         // ==================== Facade Class ====================
@@ -711,6 +882,227 @@
         let trainData = [];
         let trainTargets = [];
 
+        // ==================== Forest Visualization ====================
+        function visualizeForest(forest, containerId) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            
+            const numTrees = forest.numTrees || 0;
+            const numFeatures = forest.getNumFeatures() || 0;
+            const trainedTrees = forest.getNumTrees() || 0;
+            const taskType = forest.taskType || 'classification';
+            
+            const spacing = 60;
+            const padding = 20;
+            const legendSpace = 120;
+            const treeDisplayCount = Math.min(numTrees, 15);
+            const totalWidth = Math.max(500, legendSpace + padding * 2 + 120 + treeDisplayCount * spacing + 120);
+            const totalHeight = 200;
+            
+            const svgContainer = document.createElement('div');
+            svgContainer.setAttribute('style', 'overflow-x: auto; overflow-y: hidden; border: 1px solid #ccc; background: #fafafa; border-radius: 4px; margin: 1rem 0; height: 220px;');
+            
+            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.setAttribute('width', totalWidth);
+            svg.setAttribute('height', totalHeight);
+            svg.setAttribute('style', 'display: block;');
+            
+            const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+            defs.innerHTML = `
+                <linearGradient id="inputGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:#4285f4;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#1967d2;stop-opacity:1" />
+                </linearGradient>
+                <linearGradient id="treeGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:#34a853;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#188038;stop-opacity:1" />
+                </linearGradient>
+                <linearGradient id="treeUntrainedGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:#9e9e9e;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#616161;stop-opacity:1" />
+                </linearGradient>
+                <linearGradient id="outputGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:#fbbc04;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#f57d00;stop-opacity:1" />
+                </linearGradient>
+            `;
+            svg.appendChild(defs);
+            
+            const cy = totalHeight / 2;
+            let xPos = padding + legendSpace;
+            
+            drawForestBox(svg, xPos, cy, 'Input', `${numFeatures} feat`, 'url(#inputGrad)', '#1967d2');
+            xPos += 100;
+            
+            drawLine(svg, xPos - 40, cy, xPos + 10, cy - 30);
+            drawLine(svg, xPos - 40, cy, xPos + 10, cy);
+            drawLine(svg, xPos - 40, cy, xPos + 10, cy + 30);
+            xPos += 20;
+            
+            for (let i = 0; i < treeDisplayCount; i++) {
+                const isTrained = i < trainedTrees;
+                const treeY = cy + (i % 3 - 1) * 35;
+                drawTreeIcon(svg, xPos, treeY, i + 1, isTrained);
+                xPos += spacing;
+            }
+            
+            if (numTrees > treeDisplayCount) {
+                const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                text.setAttribute('x', xPos - 30);
+                text.setAttribute('y', cy + 5);
+                text.setAttribute('text-anchor', 'middle');
+                text.setAttribute('font-size', '14');
+                text.setAttribute('fill', '#666');
+                text.textContent = `+${numTrees - treeDisplayCount}`;
+                svg.appendChild(text);
+                xPos += 30;
+            }
+            
+            drawLine(svg, xPos - 20, cy - 30, xPos + 30, cy);
+            drawLine(svg, xPos - 20, cy, xPos + 30, cy);
+            drawLine(svg, xPos - 20, cy + 30, xPos + 30, cy);
+            xPos += 40;
+            
+            const outputLabel = taskType === 'classification' ? 'Vote' : 'Mean';
+            drawForestBox(svg, xPos, cy, 'Output', outputLabel, 'url(#outputGrad)', '#f57d00');
+            
+            drawForestLegend(svg, padding + 5, cy - 50, trainedTrees, numTrees);
+            
+            svgContainer.appendChild(svg);
+            container.innerHTML = '';
+            container.appendChild(svgContainer);
+        }
+
+        function drawForestBox(svg, x, cy, label1, label2, fill, stroke) {
+            const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            const box = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            box.setAttribute('x', x - 30);
+            box.setAttribute('y', cy - 35);
+            box.setAttribute('width', 60);
+            box.setAttribute('height', 70);
+            box.setAttribute('fill', fill);
+            box.setAttribute('stroke', stroke);
+            box.setAttribute('stroke-width', 1.5);
+            box.setAttribute('rx', 3);
+            g.appendChild(box);
+            
+            const text1 = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            text1.setAttribute('x', x);
+            text1.setAttribute('y', cy - 8);
+            text1.setAttribute('text-anchor', 'middle');
+            text1.setAttribute('font-size', '10');
+            text1.setAttribute('font-weight', 'bold');
+            text1.setAttribute('fill', 'white');
+            text1.textContent = label1;
+            g.appendChild(text1);
+            
+            const text2 = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            text2.setAttribute('x', x);
+            text2.setAttribute('y', cy + 8);
+            text2.setAttribute('text-anchor', 'middle');
+            text2.setAttribute('font-size', '9');
+            text2.setAttribute('fill', 'white');
+            text2.textContent = label2;
+            g.appendChild(text2);
+            
+            svg.appendChild(g);
+        }
+
+        function drawTreeIcon(svg, x, cy, treeNum, isTrained) {
+            const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            const fill = isTrained ? 'url(#treeGrad)' : 'url(#treeUntrainedGrad)';
+            const stroke = isTrained ? '#188038' : '#616161';
+            
+            const trunk = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            trunk.setAttribute('x', x - 4);
+            trunk.setAttribute('y', cy + 8);
+            trunk.setAttribute('width', 8);
+            trunk.setAttribute('height', 12);
+            trunk.setAttribute('fill', '#8d6e63');
+            trunk.setAttribute('rx', 1);
+            g.appendChild(trunk);
+            
+            const crown = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+            crown.setAttribute('points', `${x},${cy - 22} ${x - 18},${cy + 10} ${x + 18},${cy + 10}`);
+            crown.setAttribute('fill', fill);
+            crown.setAttribute('stroke', stroke);
+            crown.setAttribute('stroke-width', 1);
+            g.appendChild(crown);
+            
+            const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            text.setAttribute('x', x);
+            text.setAttribute('y', cy + 1);
+            text.setAttribute('text-anchor', 'middle');
+            text.setAttribute('font-size', '8');
+            text.setAttribute('font-weight', 'bold');
+            text.setAttribute('fill', 'white');
+            text.textContent = treeNum;
+            g.appendChild(text);
+            
+            svg.appendChild(g);
+        }
+
+        function drawLine(svg, x1, y1, x2, y2) {
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', x1);
+            line.setAttribute('y1', y1);
+            line.setAttribute('x2', x2);
+            line.setAttribute('y2', y2);
+            line.setAttribute('stroke', '#999');
+            line.setAttribute('stroke-width', 1);
+            svg.appendChild(line);
+        }
+
+        function drawForestLegend(svg, x, y, trainedTrees, totalTrees) {
+            const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            
+            const box1 = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            box1.setAttribute('x', x);
+            box1.setAttribute('y', y);
+            box1.setAttribute('width', 12);
+            box1.setAttribute('height', 12);
+            box1.setAttribute('fill', 'url(#treeGrad)');
+            box1.setAttribute('stroke', '#188038');
+            box1.setAttribute('rx', 2);
+            g.appendChild(box1);
+            
+            const label1 = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            label1.setAttribute('x', x + 16);
+            label1.setAttribute('y', y + 10);
+            label1.setAttribute('font-size', '9');
+            label1.setAttribute('fill', '#333');
+            label1.textContent = `Trained (${trainedTrees})`;
+            g.appendChild(label1);
+            
+            const box2 = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            box2.setAttribute('x', x);
+            box2.setAttribute('y', y + 18);
+            box2.setAttribute('width', 12);
+            box2.setAttribute('height', 12);
+            box2.setAttribute('fill', 'url(#treeUntrainedGrad)');
+            box2.setAttribute('stroke', '#616161');
+            box2.setAttribute('rx', 2);
+            g.appendChild(box2);
+            
+            const label2 = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            label2.setAttribute('x', x + 16);
+            label2.setAttribute('y', y + 28);
+            label2.setAttribute('font-size', '9');
+            label2.setAttribute('fill', '#333');
+            label2.textContent = `Untrained`;
+            g.appendChild(label2);
+            
+            const label3 = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            label3.setAttribute('x', x);
+            label3.setAttribute('y', y + 50);
+            label3.setAttribute('font-size', '9');
+            label3.setAttribute('fill', '#666');
+            label3.textContent = `Total: ${totalTrees}`;
+            g.appendChild(label3);
+            
+            svg.appendChild(g);
+        }
+
         // ==================== UI Functions ====================
         function createForest() {
             const config = {
@@ -726,6 +1118,7 @@
             facade = new RandomForestFacade(forest);
             document.getElementById('forestStatus').textContent = '✓ Forest created';
             document.getElementById('forestStatus').style.color = 'green';
+            visualizeForest(forest, 'forestViz');
         }
 
         function generateData() {
@@ -795,6 +1188,8 @@
                     <div class="metric">Samples: ${trainData.length}</div>
                 `;
 
+                visualizeForest(forest, 'forestViz');
+
                 setTimeout(() => {
                     progressBar.style.display = 'none';
                 }, 1000);
@@ -818,6 +1213,89 @@
             const prediction = forest.predict(sample);
             const output = document.getElementById('predictOutput');
             output.innerHTML = `<div class="metric">Prediction: ${prediction.toFixed(4)}</div>`;
+        }
+
+        // ==================== Save/Load Functions ====================
+        function saveForest() {
+            if (!forest) {
+                alert('Please create a forest first.');
+                return;
+            }
+            
+            const jsonStr = forest.toJSON();
+            const blob = new Blob([jsonStr], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'forest-model.json';
+            a.click();
+            
+            document.getElementById('loadStatus').textContent = '✓ Forest saved.';
+            document.getElementById('loadStatus').style.color = 'green';
+        }
+        
+        function loadForest() {
+            const fileInput = document.getElementById('modelFile');
+            
+            fileInput.onchange = function(evt) {
+                const file = evt.target.files[0];
+                if (!file) {
+                    document.getElementById('loadStatus').textContent = 'No file selected';
+                    return;
+                }
+                
+                document.getElementById('loadStatus').textContent = 'Loading...';
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        forest = RandomForest.fromJSON(e.target.result);
+                        facade = new RandomForestFacade(forest);
+                        
+                        const trainedTrees = forest.getNumTrees();
+                        const numFeatures = forest.getNumFeatures();
+                        
+                        // Update UI with loaded model config
+                        document.getElementById('numTrees').value = forest.numTrees;
+                        document.getElementById('maxDepth').value = forest.maxDepth;
+                        document.getElementById('minSamplesLeaf').value = forest.minSamplesLeaf;
+                        document.getElementById('minSamplesSplit').value = forest.minSamplesSplit;
+                        document.getElementById('taskType').value = forest.taskType;
+                        document.getElementById('criterion').value = forest.criterion;
+                        document.getElementById('randomSeed').value = forest.randomSeed;
+                        
+                        // Update predict input placeholder
+                        if (numFeatures > 0) {
+                            const placeholderValues = Array(numFeatures).fill(0).map((_, i) => (i * 0.1).toFixed(1));
+                            document.getElementById('predictInput').value = placeholderValues.join(',');
+                        }
+                        
+                        document.getElementById('loadStatus').textContent = 
+                            `✓ Loaded! Trees: ${forest.numTrees} (${trainedTrees} trained), ` +
+                            `Features: ${numFeatures}, Samples: ${forest.numSamples}, ` +
+                            `Task: ${forest.taskType}, Criterion: ${forest.criterion}`;
+                        document.getElementById('loadStatus').style.color = 'green';
+                        
+                        document.getElementById('forestStatus').textContent = '✓ Forest loaded from file';
+                        document.getElementById('forestStatus').style.color = 'green';
+                        
+                        visualizeForest(forest, 'forestViz');
+                        
+                    } catch (err) {
+                        document.getElementById('loadStatus').textContent = 'Error: ' + err.message;
+                        document.getElementById('loadStatus').style.color = 'red';
+                        console.error('Load error:', err);
+                    }
+                };
+                
+                reader.onerror = function(err) {
+                    document.getElementById('loadStatus').textContent = 'Error reading file';
+                    document.getElementById('loadStatus').style.color = 'red';
+                };
+                
+                reader.readAsText(file);
+            };
+            
+            fileInput.click();
         }
 
         // ==================== Facade Functions ====================
